@@ -2,16 +2,19 @@ import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
-
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Authorization from './pages/Auth'
+import { Home } from './pages/Home'
 function App() {
-  const [count, setCount] = useState(0)
+
 
   return (
-    <>
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-        hello world
-        </div>
-    </>
+        <Router>
+      <Routes>
+        <Route path="/" element={<Authorization/>} />
+        <Route path="/home" element={<Home />} />
+      </Routes>
+    </Router>
   )
 }
 
