@@ -46,7 +46,7 @@ const useSignUp = (Navigate) => ({
                 attempt: async ({ code }) => {
                     if (code === '123456') {
                         console.log('Sign-up verification successful');
-                          Navigate('/home') 
+                          Navigate('/home')
                         return { status: 'complete', createdSessionId: 'sess_xyz789' };
                     }
                     throw new Error('Invalid OTP');
@@ -89,7 +89,7 @@ export default function Authorization() {
     address: '',
     city: '',
     state: '',
-    pincode: '',
+    pincode: '110018',
     role: 'vendor',
   });
 
