@@ -1,12 +1,12 @@
 import React from 'react';
-// import { useUser, UserButton } from '@clerk/clerk-react';
+import { useUser, UserButton } from '@clerk/clerk-react';
 
 const Header = () => {
     // The useUser hook provides user information.
-    // const { user } = useUser();
+    const { user } = useUser();
     // Safely access the role from metadata.
-    // const role = user?.unsafeMetadata?.role || '...';
-const role = 'vendor';
+    const role = user?.unsafeMetadata?.role || '...';
+
     return (
         <header className="bg-white shadow-md sticky top-0 z-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
@@ -21,7 +21,8 @@ const role = 'vendor';
                    <span className="hidden sm:inline-block text-sm font-medium text-gray-600 capitalize bg-gray-100 px-3 py-1 rounded-full">
                        Role: {role}
                    </span>
-                   {/* <UserButton afterSignOutUrl="/" /> */}
+                   {/* This is the standard Clerk component for user profile and sign out */}
+                   <UserButton afterSignOutUrl="/" />
                 </div>
             </div>
         </header>

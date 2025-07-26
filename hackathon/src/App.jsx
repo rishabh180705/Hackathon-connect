@@ -26,7 +26,7 @@ const AppLayout = () => {
 
 function App() {
   return (
-    <Router>
+
       <Routes>
         {/* Route for the authorization page, which does NOT have the main header/footer */}
         <Route path="/" element={<Authorization />} />
@@ -38,7 +38,7 @@ function App() {
           {/* e.g., <Route path="/profile" element={<ProfilePage />} /> */}
         </Route>
       </Routes>
-    </Router>
+   
   );
 }
 
