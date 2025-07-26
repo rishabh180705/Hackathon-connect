@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { useSignIn, useSignUp } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 import { Smartphone, User, KeyRound, Building, MapPin, ChevronLeft } from 'lucide-react';
-
+import { StoreContext } from '../context/contextStore.jsx';
 // Main Authentication Component
 export default function Authorization() {
   const navigate = useNavigate();
   const [authStep, setAuthStep] = useState('initial'); // 'initial', 'login', 'signup', 'otp'
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const {phoneNumber, setPhoneNumber} = React.useContext(StoreContext);
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
