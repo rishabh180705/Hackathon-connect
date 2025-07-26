@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import VendorDashboard from '../components/VendorDashboard';
 import SupplierDashboard from '../components/SupplierDashboard';
+import { StoreContext } from '../context/contextStore.jsx'; // Assuming this is the correct path
 
 // Mock data to simulate a database.
 // In a real app, this would come from your backend API.
@@ -19,12 +20,19 @@ const mockBids = [
 ];
 
 
-export const HomePage = ({ role, pincode }) => {
-    role = '';
-    pincode = '110018';
+export const HomePage = () => {
+    // Get user object from the global StoreContext
+    const { user } = useContext(StoreContext);
+
+    // Safely access role and pincode from the user object's metadata
+    const role = user?.unsafeMetadata?.role || 'vendor'; // Default to 'vendor'
+    const pincode = user?.unsafeMetadata?.pincode || 110001;
+
     // This function aggregates requirements by item and pincode.
     // In a real app, this logic would likely live on your backend.
     const getAggregatedDemands = (pincode) => {
+        if (!pincode) return {}; // Return empty if no pincode is available
+
         const demands = {};
         mockRequirements
             .filter(req => req.pincode === pincode && req.status === 'open')
@@ -70,4 +78,3 @@ export const HomePage = ({ role, pincode }) => {
         </div>
     );
 };
-

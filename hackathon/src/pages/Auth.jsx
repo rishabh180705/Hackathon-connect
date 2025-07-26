@@ -1,13 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { useSignIn, useSignUp } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 import { Smartphone, User, KeyRound, Building, MapPin, ChevronLeft } from 'lucide-react';
 import { StoreContext } from '../context/contextStore.jsx';
+
 // Main Authentication Component
 export default function Authorization() {
   const navigate = useNavigate();
   const [authStep, setAuthStep] = useState('initial'); // 'initial', 'login', 'signup', 'otp'
-  const {phoneNumber, setPhoneNumber} = React.useContext(StoreContext);
+  
+  // Get state and setters from the context
+  const { phoneNumber, setPhoneNumber, setUser } = useContext(StoreContext);
+  
+  // Local state for this component
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +37,7 @@ export default function Authorization() {
     setFormData({ ...formData, [name]: value });
   };
 
-// --- Logic for Sign-In ---
+  // --- Logic for Sign-In ---
   const handleSignIn = async (e) => {
     e.preventDefault();
     if (!isSignInLoaded) return;
@@ -53,7 +58,6 @@ export default function Authorization() {
       );
 
       if (phoneCodeFactor) {
-        // CORRECTED: Pass the phoneNumberId from the factor into the prepareFirstFactor call.
         await signInAttempt.prepareFirstFactor({
           strategy: 'phone_code',
           phoneNumberId: phoneCodeFactor.phoneNumberId,
@@ -83,8 +87,6 @@ export default function Authorization() {
     setIsLoading(true);
 
     try {
-      // Create the user with all data at once.
-      // FIXED: firstName and lastName are now correctly placed inside unsafeMetadata.
       await signUp.create({
         phoneNumber: `+91${phoneNumber}`,
         unsafeMetadata: {
@@ -98,7 +100,6 @@ export default function Authorization() {
         }
       });
 
-      // After creation, prepare for OTP verification
       await signUp.preparePhoneNumberVerification();
       setAuthStep('otp');
       setIsSignUpFlow(true);
@@ -133,6 +134,13 @@ export default function Authorization() {
       if (result.status === 'complete') {
         const setActive = isSignUpFlow ? setSignUpActive : setSignInActive;
         await setActive({ session: result.createdSessionId });
+        
+        // Set the user object in the global context after successful verification
+        if (result.createdSessionId) {
+            const userObject = isSignUpFlow ? signUp.createdUser : signIn.user;
+            setUser(userObject);
+        }
+
         navigate('/home');
       }
     } catch (err) {
