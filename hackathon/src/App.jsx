@@ -1,11 +1,14 @@
+import React from 'react';
 import './App.css';
-import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
+import { Routes, Route, Outlet, Navigate } from 'react-router-dom';
+import { SignedIn, SignedOut } from '@clerk/clerk-react';
 
 // Import your pages and layout components
 import Authorization from './pages/Auth'; // Assuming path is correct
 import { HomePage } from './pages/HomePage'; // Assuming path is correct
 import Header from './components/Header'; // Assuming path is correct
 import Footer from './components/Footer'; // Assuming path is correct
+import BiddingPage from './pages/BiddingPage'; // Assuming path is correct
 
 /**
  * AppLayout component
@@ -26,19 +29,37 @@ const AppLayout = () => {
 
 function App() {
   return (
+    <Routes>
+      {/* PUBLIC ROUTE: This route handles the root path. */}
+      <Route 
+        path="/" 
+        element={
+          <>
+            {/* If the user is signed in, redirect them from the root to the home page. */}
+            <SignedIn>
+              <Navigate to="/home" />
+            </SignedIn>
+            {/* If the user is signed out, show the Authorization (login) page. */}
+            <SignedOut>
+              <Authorization />
+            </SignedOut>
+          </>
+        } 
+      />
 
-      <Routes>
-        {/* Route for the authorization page, which does NOT have the main header/footer */}
-        <Route path="/" element={<Authorization />} />
-
-        {/* A parent route that uses the AppLayout. All nested routes will render inside it. */}
-        <Route element={<AppLayout />}>
-          <Route path="/home" element={<HomePage />} />
-          {/* You can add other pages that need the header and footer here */}
-          {/* e.g., <Route path="/profile" element={<ProfilePage />} /> */}
-        </Route>
-      </Routes>
-   
+      {/* PROTECTED ROUTES: All routes within this group require the user to be signed in. */}
+      <Route
+        element={
+          <SignedIn>
+            <AppLayout />
+          </SignedIn>
+        }
+      >
+        <Route path="/home" element={<HomePage />} />
+        <Route path="/bidding" element={<BiddingPage />} />
+        {/* You can add other protected routes here */}
+      </Route>
+    </Routes>
   );
 }
 
