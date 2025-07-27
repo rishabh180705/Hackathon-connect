@@ -2,12 +2,16 @@ import React, { useState } from 'react';
 import { useSignIn, useSignUp } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 import { Smartphone, User, KeyRound, Building, MapPin, ChevronLeft } from 'lucide-react';
-import { StoreContext } from '../context/contextStore.jsx';
-// Main Authentication Component
+import { createUserInDb } from '../utils/api'; // Import the API function
+
+// Main Authentication Component - Now self-contained
 export default function Authorization() {
   const navigate = useNavigate();
   const [authStep, setAuthStep] = useState('initial'); // 'initial', 'login', 'signup', 'otp'
-  const {phoneNumber, setPhoneNumber} = React.useContext(StoreContext);
+
+  // --- Local state for this component ---
+  // The phone number is now managed locally instead of via context.
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -20,32 +24,34 @@ export default function Authorization() {
     city: '',
     state: '',
     pincode: '',
-    role: '',
+    role: 'vendor', // Default role
   });
 
-  // --- Real Clerk Hooks ---
+  // --- Clerk Hooks for Sign-In and Sign-Up ---
   const { isLoaded: isSignInLoaded, signIn, setActive: setSignInActive } = useSignIn();
   const { isLoaded: isSignUpLoaded, signUp, setActive: setSignUpActive } = useSignUp();
+
+  // --- Event Handlers ---
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
 
-// --- Logic for Sign-In ---
+  // Logic for Sign-In
   const handleSignIn = async (e) => {
     e.preventDefault();
     if (!isSignInLoaded) return;
-    if (!/^\d{10}$/.test(phoneNumber)) {
-      setError('Please enter a valid 10-digit mobile number.');
-      return;
-    }
+    // if (!/^\d{10}$/.test(phoneNumber)) {
+    //   setError('Please enter a valid 10-digit mobile number.');
+    //   return;
+    // }
     setError('');
     setIsLoading(true);
 
     try {
       const signInAttempt = await signIn.create({
-        identifier: `+91${phoneNumber}`,
+        identifier: `+${phoneNumber}`,
       });
 
       const phoneCodeFactor = signInAttempt.supportedFirstFactors.find(
@@ -53,7 +59,6 @@ export default function Authorization() {
       );
 
       if (phoneCodeFactor) {
-        // CORRECTED: Pass the phoneNumberId from the factor into the prepareFirstFactor call.
         await signInAttempt.prepareFirstFactor({
           strategy: 'phone_code',
           phoneNumberId: phoneCodeFactor.phoneNumberId,
@@ -71,22 +76,22 @@ export default function Authorization() {
     }
   };
 
-  // --- Corrected Logic for Sign-Up ---
+  // Logic for Sign-Up
   const handleSignUp = async (e) => {
     e.preventDefault();
     if (!isSignUpLoaded) return;
-    if (!/^\d{10}$/.test(phoneNumber)) {
-      setError('Please enter a valid 10-digit mobile number.');
-      return;
-    }
+    // if (!/^\d{10}$/.test(phoneNumber)) {
+    //   setError('Please enter a valid 10-digit mobile number.');
+    //   return;
+    // }
     setError('');
     setIsLoading(true);
 
     try {
-      // Create the user with all data at once.
-      // FIXED: firstName and lastName are now correctly placed inside unsafeMetadata.
       await signUp.create({
-        phoneNumber: `+91${phoneNumber}`,
+        phoneNumber: `+${phoneNumber}`,
+        // firstName: formData.firstName,
+        // lastName: formData.lastName,
         unsafeMetadata: {
           firstName: formData.firstName,
           lastName: formData.lastName,
@@ -98,7 +103,6 @@ export default function Authorization() {
         }
       });
 
-      // After creation, prepare for OTP verification
       await signUp.preparePhoneNumberVerification();
       setAuthStep('otp');
       setIsSignUpFlow(true);
@@ -110,7 +114,7 @@ export default function Authorization() {
     }
   };
 
-  // --- Unified OTP Verification ---
+  // Unified OTP Verification
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     if (otp.length !== 6) {
@@ -125,6 +129,17 @@ export default function Authorization() {
       if (isSignUpFlow) {
         if (!isSignUpLoaded) return;
         result = await signUp.attemptPhoneNumberVerification({ code: otp });
+
+        // **DATABASE INTEGRATION**
+        // After successful sign-up in Clerk, save the user to your database.
+        if (result.status === 'complete') {
+            await createUserInDb({
+                clerkUserId: result.createdUserId,
+                ...formData,
+                phoneNumber: phoneNumber,
+            });
+        }
+
       } else {
         if (!isSignInLoaded) return;
         result = await signIn.attemptFirstFactor({ strategy: 'phone_code', code: otp });
@@ -132,12 +147,14 @@ export default function Authorization() {
 
       if (result.status === 'complete') {
         const setActive = isSignUpFlow ? setSignUpActive : setSignInActive;
+        // Setting the active session is all that's needed.
+        // Clerk's hooks (useUser, useSession) will automatically update elsewhere.
         await setActive({ session: result.createdSessionId });
         navigate('/home');
       }
     } catch (err) {
       console.error(JSON.stringify(err, null, 2));
-      setError(err.errors ? err.errors[0].longMessage : 'Invalid OTP or an error occurred.');
+      setError(err.errors ? (err.response?.data?.message || err.errors[0].longMessage) : 'An error occurred.');
     } finally {
       setIsLoading(false);
     }
@@ -176,7 +193,7 @@ export default function Authorization() {
       <form onSubmit={handleSignIn}>
         <div className="relative mb-4">
           <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <span className="absolute left-10 top-1/2 -translate-y-1/2 text-gray-600 font-semibold">+91</span>
+          <span className="absolute left-10 top-1/2 -translate-y-1/2 text-gray-600 font-semibold">+</span>
           <input type="tel" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="Your mobile number" className="w-full pl-20 pr-3 py-3 border border-gray-300 rounded-lg" required />
         </div>
         <button type="submit" disabled={isLoading} className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-blue-300">
@@ -189,7 +206,7 @@ export default function Authorization() {
   const renderOtpForm = () => (
     <>
       <h2 className="text-2xl font-bold text-center text-gray-800">Verify OTP</h2>
-      <p className="text-center text-gray-500 mb-8">Enter the 6-digit code sent to +91 {phoneNumber}.</p>
+      <p className="text-center text-gray-500 mb-8">Enter the 6-digit code sent to + {phoneNumber}.</p>
       <form onSubmit={handleVerifyOtp}>
         <div className="relative mb-4">
           <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
@@ -235,8 +252,17 @@ export default function Authorization() {
   const renderInputField = (name, placeholder, type = 'text', icon, isPhone = false) => (
     <div className="relative">
       {icon && <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">{React.cloneElement(icon, { size: 20 })}</div>}
-      {isPhone && <span className="absolute left-10 top-1/2 -translate-y-1/2 text-gray-600 font-semibold">+91</span>}
-      <input type={type} name={name} id={name} value={name === 'phoneNumber' ? phoneNumber : formData[name]} onChange={name === 'phoneNumber' ? (e) => setPhoneNumber(e.target.value) : handleInputChange} placeholder={placeholder} className={`w-full ${icon ? (isPhone ? 'pl-20' : 'pl-12') : 'pl-3'} pr-3 py-3 border border-gray-300 rounded-lg`} required />
+      {isPhone && <span className="absolute left-10 top-1/2 -translate-y-1/2 text-gray-600 font-semibold">+</span>}
+      <input
+        type={type}
+        name={name}
+        id={name}
+        value={name === 'phoneNumber' ? phoneNumber : formData[name]}
+        onChange={name === 'phoneNumber' ? (e) => setPhoneNumber(e.target.value) : handleInputChange}
+        placeholder={placeholder}
+        className={`w-full ${icon ? (isPhone ? 'pl-20' : 'pl-12') : 'pl-3'} pr-3 py-3 border border-gray-300 rounded-lg`}
+        required
+      />
     </div>
   );
 
@@ -245,7 +271,8 @@ export default function Authorization() {
       case 'login': return renderMobileForm();
       case 'signup': return renderSignUpForm();
       case 'otp': return renderOtpForm();
-      case 'initial': default: return renderInitial();
+      case 'initial':
+      default: return renderInitial();
     }
   };
 

@@ -1,21 +1,60 @@
 import React, { useState } from 'react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { BarChart, Tag, Users, Handshake } from 'lucide-react';
+import { postBid } from '../utils/api'; // Import the API function
 
-const SupplierDashboard = ({ pincode, aggregatedDemands }) => {
+const SupplierDashboard = ({ pincode, aggregatedDemands, onBidSubmit }) => {
+    const { userId } = useAuth(); // Get the current user's Clerk ID
+    const { user } = useUser(); // Get the full user object for metadata
+
     const [bidItem, setBidItem] = useState(null);
     const [bidPrice, setBidPrice] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handlePlaceBidClick = (item, currentLowestBid) => {
+    const handlePlaceBidClick = (item, data) => {
         setBidItem(item);
-        setBidPrice(currentLowestBid ? String(currentLowestBid - 1) : '');
+        // Suggest a starting price slightly lower than the current best
+        setBidPrice(data.lowestBid ? String(data.lowestBid - 0.5) : String(data.highestPrice - 1));
     };
     
-    const handleBidSubmit = (e) => {
+    const handleBidSubmit = async (e, item, currentLowestBid) => {
         e.preventDefault();
-        // API call to submit the bid
-        alert(`Bid Placed!\nItem: ${bidItem}\nPrice: ${bidPrice}`);
-        setBidItem(null);
-        setBidPrice('');
+        if (!userId || !user) {
+            alert("You must be logged in to place a bid.");
+            return;
+        }
+
+        const priceNum = Number(bidPrice);
+        // Client-side validation
+        if (currentLowestBid && priceNum >= currentLowestBid) {
+            alert(`Your bid must be lower than the current lowest bid of ₹${currentLowestBid}.`);
+            return;
+        }
+
+        setIsSubmitting(true);
+
+        const bidData = {
+            item: item,
+            state: user.unsafeMetadata?.state,
+            clerkUserId: userId,
+            supplierName: user.unsafeMetadata.firstName || 'Anonymous Supplier',
+            price: priceNum,
+        };
+
+        try {
+            const response = await postBid(bidData);
+            alert(`Bid Placed Successfully!`);
+            onBidSubmit(response.data); // Notify HomePage to update its state
+            setBidItem(null);
+            setBidPrice('');
+        } catch (error) {
+            console.error("Failed to submit bid:", error);
+            // Use the error message from the backend if available
+            const errorMessage = error.response?.data?.message || "Could not place your bid. Please try again.";
+            alert(`Error: ${errorMessage}`);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -41,20 +80,22 @@ const SupplierDashboard = ({ pincode, aggregatedDemands }) => {
                                 <div className="mt-4 md:mt-0 text-left md:text-right">
                                     <p className="text-sm text-gray-500">Current Lowest Bid</p>
                                     <p className="text-2xl font-bold text-green-600">{data.lowestBid ? `₹${data.lowestBid}` : 'N/A'}</p>
-                                    <button onClick={() => handlePlaceBidClick(item, data.lowestBid)} className="mt-2 bg-purple-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-purple-700 transition text-sm">
+                                    <button onClick={() => handlePlaceBidClick(item, data)} className="mt-2 bg-purple-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-purple-700 transition text-sm">
                                         Place a Bid
                                     </button>
                                 </div>
                             </div>
                             {bidItem === item && (
-                                <form onSubmit={handleBidSubmit} className="mt-4 p-4 bg-gray-50 rounded-lg">
+                                <form onSubmit={(e) => handleBidSubmit(e, item, data.lowestBid)} className="mt-4 p-4 bg-gray-50 rounded-lg">
                                     <h5 className="font-semibold mb-2">Your Bid for {item}</h5>
                                     <div className="flex items-end gap-4">
                                         <div>
                                             <label htmlFor="bidPrice" className="block text-sm font-medium text-gray-700">Your Offer Price (per {data.unit})</label>
-                                            <input type="number" id="bidPrice" value={bidPrice} onChange={e => setBidPrice(e.target.value)} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required />
+                                            <input type="number" id="bidPrice" value={bidPrice} onChange={e => setBidPrice(e.target.value)} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required step="0.01" />
                                         </div>
-                                        <button type="submit" className="bg-green-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-700 transition flex items-center"><Handshake className="w-4 h-4 mr-2"/>Submit Bid</button>
+                                        <button type="submit" disabled={isSubmitting} className="bg-green-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-700 transition flex items-center disabled:bg-green-300">
+                                            <Handshake className="w-4 h-4 mr-2"/>{isSubmitting ? 'Submitting...' : 'Submit Bid'}
+                                        </button>
                                         <button type="button" onClick={() => setBidItem(null)} className="bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-semibold hover:bg-gray-300 transition">Cancel</button>
                                     </div>
                                 </form>
